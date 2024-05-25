@@ -45,4 +45,4 @@ if __name__ == '__main__':
     pass
 ```
 
-<!-- See `examples` for an example usages of the library. ->>
+<!-- See `examples` for example usages of the library. ->>
