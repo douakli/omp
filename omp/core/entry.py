@@ -112,6 +112,8 @@ def enable(*args, **kwargs):
     """
 
     def decorator(function):
+        # The user code calls `enable` which itself calls `decorator`.
+        # We need to go back two stack frames.
         caller_frame = inspect.currentframe().f_back.f_back
         globs, locs = caller_frame.f_globals, caller_frame.f_locals
 
@@ -130,7 +132,7 @@ def enable(*args, **kwargs):
             )
 
         # ALERT: Remove this debug print. (Shows the final transformed source code.)
-        # print(ast.unparse(patched_ast))
+        print(ast.unparse(patched_ast))
 
         # Compile the patched ast.
         patched: CodeType = compile(patched_ast, filename=inspect.getsourcefile(function), mode='exec')
