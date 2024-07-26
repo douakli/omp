@@ -59,7 +59,8 @@ def _omp_internal_inner_func():
         # To find the list of local variables defined in the function, we need to compile it.
         globs, locs = dict(), dict()
         exec(compile(ast_template, '<OMP Parser>', mode='exec'), globs, locs)
-        return locs['_omp_internal_inner_func'].__code__.co_varnames
+
+        return locs['_omp_internal_inner_func'].__code__.co_varnames + locs['_omp_internal_inner_func'].__code__.co_cellvars
 
 
 class OpenMP:
