@@ -1,7 +1,8 @@
 # Native OpenMP for Python
 This library is a proof of concept of a native OpenMP implementation in python.
 
-So far, only the parallel and for directives are implemented. No clauses are supported so far.
+The `barrier`, `critical`, `for`, `parallel`, `parallel for` and `single` directives are supported,
+as well as the `collapse`, `private` and `nowait` clauses.
 
 Here is an example program that uses the library.
 
