@@ -1,13 +1,39 @@
 import ast
+import threading
+
+
+class Clause:
+
+    def __init__(self, directive: 'Directive', args: str):
+        self.directive = directive
+        self.args = args
+
+        self.directive.clauses.append(self)
 
 
 class Directive:
+
+    def __init__(self, openMP: 'OpenMP'):
+        self.openMP = openMP
+        self.clauses: list(Clause) = []
+
+        self.privates = set()
+        self.nowait = False
+        self.collapse = dict()
 
     def parse(self, node: ast.With) -> ast.With:
         """
         Convert the given With OpenMP construct with its implementation.
         """
-        raise NotImplementedError()
+        # raise NotImplementedError()
+        pass
+
+    def run(self):
+        """
+        Implementation of an OpenMP directive
+        """
+        #raise NotImplementedError()
+        pass
 
     @staticmethod
     def replace(target: list[ast.AST], content: list[ast.AST], match: ast.AST = ast.Pass) -> list[ast.AST]:
@@ -39,8 +65,8 @@ class Directive:
                 )
             )]
 
-    @staticmethod
-    def list_locals(body: list[ast.AST]) -> list[str]:
+    # @staticmethod
+    def list_locals(self, body: list[ast.AST]) -> list[str]:
         """
         Return a list of the local variables used in the given function body.
         """
@@ -60,7 +86,7 @@ def _omp_internal_inner_func():
         globs, locs = dict(), dict()
         exec(compile(ast_template, '<OMP Parser>', mode='exec'), globs, locs)
 
-        return locs['_omp_internal_inner_func'].__code__.co_varnames + locs['_omp_internal_inner_func'].__code__.co_cellvars
+        return set(locs['_omp_internal_inner_func'].__code__.co_varnames + locs['_omp_internal_inner_func'].__code__.co_cellvars) - self.privates
 
 
 class OpenMP:
@@ -77,13 +103,78 @@ class OpenMP:
     # All the directives supported by the library. This variable is global.
     # To register a new directive, update omp.openmp.OpenMP.directives.
     directives: dict[str, Directive] = {}
+    clauses: dict[str, Clause] = {}
 
-    def __init__(self, directive: str = ''):
-        self.directive = directive
-        # TODO: Handle directives that are not constructs.
+    dir_impl: Directive = None
+
+    @staticmethod
+    def directive(name: str):
+        """
+        This decorator is meant for internal use.
+
+        Register a new directive.
+        """
+
+        def decorator(cls):
+            OpenMP.directives.update({name: cls})
+        return decorator
+
+    @staticmethod
+    def clause(name: str, directives: list[str]):
+        """
+        This decorator is meant for internal use.
+
+        Register a new clause.
+        """
+        def decorator(cls):
+            OpenMP.clauses.update({name: (cls, directives)})
+        return decorator
+
+    def parse_clauses(self, clauses, directive):
+        i = 0
+        while i < len(clauses):
+            if clauses[i] in ('(', ',', ' '):
+                break
+            i += 1
+
+        clause = clauses[:i]
+        args = ''
+
+        if i < len(clauses):
+            j = i + 1
+            if clauses[i] == '(':
+                while j < len(clauses):
+                    if clauses[j] == ')':
+                        break
+                    j += 1
+            args = clauses[i+1:j]
+            self.parse_clauses(clauses[j+1:].strip(',').strip(), directive)
+
+        if clause in self.clauses:
+            cls, dirs = self.clauses[clause]
+            if directive in dirs:
+                cls(self.dir_impl, args)
+
+    def __init__(self, arg: str = ''):
+        words: list(str) = arg.split()
+
+        directive: str = words[0] if words else arg
+
+        # Allow for `parallel for` and future shortcut directives.
+        for word in words[1:]:
+            if f'{directive} {word}' not in self.directives:
+                break
+            directive = f'{directive} {word}'
+
+        if directive in OpenMP.directives:
+            self.dir_impl = OpenMP.directives[directive](self)
+            self.clause_str = arg[len(directive):].strip()
+            self.parse_clauses(arg[len(directive):].strip(), directive)
+
+        if not threading.current_thread().omp_parsing and self.dir_impl is not None:
+            self.dir_impl.run()
 
     def __enter__(self):
-        # TODO: Check if we are in an omp-enabled context and decide what to do.
         pass
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -96,9 +187,7 @@ class OpenMP:
         Replace this OpenMP context manager by its implementation.
         """
 
-        directive: str = self.directive.split()[0]
-
-        if directive in OpenMP.directives:
-            return OpenMP.directives[directive].parse(node)
+        if self.dir_impl is not None:
+            return self.dir_impl.parse(node)
 
         return node

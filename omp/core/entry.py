@@ -1,8 +1,12 @@
 import omp.core.openmp
+from omp.core.ast_tools import LinenoStripper
 
 import ast
 import copy
 import inspect
+import textwrap
+import threading
+
 from types import CodeType, FunctionType
 
 
@@ -39,10 +43,19 @@ class OpenMPTransformer(ast.NodeTransformer):
 
         call: ast.Call = item.context_expr
 
-        if not isinstance(call.func, ast.Name):
+        # Check that the function is referenced by Attributes of a Name, or a Name directly.
+        ref = call.func
+        while isinstance(ref, ast.Attribute):
+            ref: ast.Attribute
+            # Bulletproofing
+            if not isinstance(ref.ctx, ast.Load):
+                return self.generic_visit(node)
+            ref = ref.value
+
+        if not isinstance(ref, ast.Name):
             return self.generic_visit(node)
 
-        name: ast.Name = call.func
+        name: ast.Name = ref
 
         # Bulletproofing.
 
@@ -52,17 +65,18 @@ class OpenMPTransformer(ast.NodeTransformer):
         # In order to check that this call indeed an OpenMP instanciation,
         # we will evaluate the name being called in the function's definition namespace.
 
-        # ALERT: Catch the eventual Name Exceptions when there are other context managers...
-        expr: ast.Expression = ast.Expression(name)
-        called = eval(compile(expr, filename='<OMP Parser>', mode='eval'), self.globs, self.locs)
+        expr: ast.Expression = ast.Expression(call.func)
+        try:
+            called = eval(compile(expr, filename='<OMP Parser>', mode='eval'), self.globs, self.locs)
+        except NameError:
+            # The name we are trying to evaluate could be undefined in the context.
+            return self.generic_visit(node)
 
         if called is not omp.core.openmp.OpenMP:
             return self.generic_visit(node)
 
         # We are now sure this is an OpenMP construct. (Not necessarily a valid one.)
         # We run the found instanciation and run its logic on the found construct.
-
-        # ALERT: Catch eventual Name Exceptions when there are other context managers...
         instruction = eval(compile(ast.Expression(call), filename='<OMP Parser>', mode='eval'), self.globs, self.locs)
 
         # Parsing this node **after** its children allows us to know the exhaustive list of local variables that will be
@@ -86,12 +100,19 @@ class EnableFunction(ast.NodeTransformer):
             self.varnames = []
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> ast.FunctionDef:
-        new = copy.copy(node)
+        new = copy.deepcopy(node)
         # Remove the last decorator which should be ours if the user followed our documentation.
         new.decorator_list = new.decorator_list[:-1]
         # Inject a known name in the namespace for our library.
-        new.body = [ast.parse('import omp as _omp_internal', mode='exec').body[0]] + new.body
-        return OpenMPTransformer(self.globs, self.locs).visit(new)
+        new.body = [LinenoStripper().visit(ast.parse('import omp as _omp_internal', mode='exec').body[0])] + new.body
+
+        # Run OpenMPTransformer until the result stabilizes.
+        old_ver: str = ''
+        while old_ver != ast.dump(new):
+            old_ver = ast.dump(new)
+            new = OpenMPTransformer(self.globs, self.locs).visit(ast.fix_missing_locations(new))
+
+        return new
 
 
 def enable(*args, **kwargs):
@@ -112,16 +133,21 @@ def enable(*args, **kwargs):
     """
 
     def decorator(function):
+        threading.current_thread().omp_parsing = True
         # The user code calls `enable` which itself calls `decorator`.
         # We need to go back two stack frames.
         caller_frame = inspect.currentframe().f_back.f_back
         globs, locs = caller_frame.f_globals, caller_frame.f_locals
 
+        # We need _omp_internal for our own compilations.
+        locs.update({'_omp_internal': omp})
+
         # Retrieve the source code of the decorated function.
-        src: str = inspect.getsource(function)
+        src: str = textwrap.dedent(inspect.getsource(function))
 
         # Convert the source code to ast.
         src_ast: ast.Module = ast.parse(src, mode='exec')
+        src_ast = ast.increment_lineno(src_ast, caller_frame.f_lineno - src_ast.body[0].lineno + 1)
 
         # Patch the source ast.
         # We need to make sure that each node has a line number.
@@ -141,6 +167,8 @@ def enable(*args, **kwargs):
         # TODO: Allow enabling a function with closure (nested enabled function)
         #       Note: This would involve locating the function definition in the module's source code and recompile the outer function entirely.
         exec(patched, globs, locs)
+
+        threading.current_thread().omp_parsing = False
 
         return locs[function.__name__]
 

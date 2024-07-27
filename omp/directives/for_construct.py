@@ -1,8 +1,9 @@
+import omp
 from omp.core.openmp import Directive, OpenMP
-from omp.core.threading import Thread
+from omp.core.ast_tools import LinenoStripper
 
 import ast
-import threading
+import random
 
 
 def generator(it):
@@ -11,38 +12,51 @@ def generator(it):
 
     Overall, when all the threads of the team call this generator, all the elements of the iterator are yielded.
     """
-    thread: Thread = threading.current_thread()
     for i, el in enumerate(it):
-        if i % thread.team.size == thread.rank:
+        if i % omp.get_num_threads() == omp.get_thread_num():
             yield el
 
 
+@OpenMP.directive('for')
 class ForConstruct(Directive):
 
     """
     OpenMP for construct implementation.
     """
-    template: str = """\
+    @property
+    def template(self):
+
+        collapse_vars, collapse_operators = list(zip(*self.collapse.items()))
+        nonce = random.randint(0, 100000)
+
+        return f"""\
 with _omp_internal.core.openmp.OpenMP():
     if False:
         pass # Replaced by shared variables declarations
-    def _omp_internal_inner_func():
+    def _omp_internal_inner_func{nonce}({','.join(collapse_vars)}):
         pass # Replaced by user code
-    _omp_internal_inner_func()
+        {'#' if self.nowait else ''}_omp_internal.core.openmp.OpenMP("barrier")
+        return ({','.join(collapse_vars)},)
+    def _omp_internal_inner_func_protect{nonce}():
+        nonlocal {','.join(collapse_vars)}
+        _omp_internal_retval = _omp_internal_inner_func{nonce}({','.join(collapse_vars)})
+        with _omp_internal.core.openmp.OpenMP('critical'):
+            ({','.join(collapse_vars)},) = [_omp_internal.clauses.collapse.operators[_omp_internal_operator](_omp_internal_var, _omp_internal_val) for _omp_internal_operator, _omp_internal_var, _omp_internal_val in zip({collapse_operators}, ({','.join(collapse_vars)},), _omp_internal_retval)]
+    _omp_internal_inner_func_protect{nonce}()
     """
 
     def parse(self, node: ast.With):
         for_node: ast.For = node.body[0]
 
         # Wrap the loop iterator in our thread-distributing generator.
-        for_node.iter = ast.Call(ast.parse('_omp_internal.directives.for_construct.generator').body[0].value, args=[for_node.iter], keywords=[])
+        for_node.iter = ast.Call(LinenoStripper().visit(ast.parse('_omp_internal.directives.for_construct.generator')).body[0].value, args=[for_node.iter], keywords=[])
 
         # We need to protect the target.
         # ALERT: We need to handle unpacking as well. (`for i,j in it`)
         target = for_node.target.id
 
         # Parse the template to AST.
-        ast_template = ast.parse(self.template, mode='exec')
+        ast_template = LinenoStripper().visit(ast.parse(self.template, mode='exec'))
 
         # Extract the if statement.
         if_stmt: ast.If = ast_template.body[0].body[0]
@@ -54,7 +68,7 @@ with _omp_internal.core.openmp.OpenMP():
         shared = [name for name in self.list_locals(for_node.body) if name != target]
 
         # Replace the pass statement in the if body.
-        if_stmt.body = self.replace(if_stmt.body, self.assign_shared(shared))
+        if_stmt.body = self.replace(if_stmt.body, self.assign_shared(shared + list(self.collapse.keys())))
 
         # Replace the pass statement in the inner function body.
         nonlocals = []
@@ -63,7 +77,3 @@ with _omp_internal.core.openmp.OpenMP():
 
         inner_func.body = self.replace(inner_func.body, nonlocals + node.body)
         return ast_template.body[0]
-
-
-# Register the directive.
-OpenMP.directives.update({'for': ForConstruct()})

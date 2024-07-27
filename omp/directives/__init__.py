@@ -1,6 +1,14 @@
 import omp.directives.parallel_construct as parallel_construct
 import omp.directives.for_construct as for_construct
+import omp.directives.parallel_for_construct as parallel_for_construct
+import omp.directives.single_construct as single_construct
+import omp.directives.barrier_directive as barrier_directive
+import omp.directives.critical_construct as critical_construct
 
 # Avoid linter warnings for package shortcuts definitions.
 parallel_construct
 for_construct
+parallel_for_construct
+single_construct
+barrier_directive
+critical_construct

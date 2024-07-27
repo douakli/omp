@@ -1,13 +1,14 @@
 from omp.core.openmp import Directive, OpenMP
-from omp.core.threading import Team
 from omp.core.ast_tools import LinenoStripper
+import omp
 
-import ast
 import random
+import ast
+import threading
 
 
-@OpenMP.directive('parallel')
-class ParallelConstruct(Directive):
+@OpenMP.directive('critical')
+class CriticalConstruct(Directive):
 
     """
     OpenMP parallel construct implementation.
@@ -16,11 +17,12 @@ class ParallelConstruct(Directive):
     @property
     def template(self):
         nonce = random.randint(0, 100000)
+
         return f"""\
 with _omp_internal.core.openmp.OpenMP():
     if False:
         pass # Replaced by shared variables declarations
-    @_omp_internal.directives.parallel_construct.run_parallel
+    @_omp_internal.directives.critical_construct.run_critical
     def _omp_internal_inner_func{nonce}():
         pass # Replaced by user code
     _omp_internal_inner_func{nonce}()
@@ -51,15 +53,9 @@ with _omp_internal.core.openmp.OpenMP():
         return ast_template.body[0]
 
 
-def run_parallel(func):
-    """
-    When the new function is called, creates a team of threads that will each run the given function concurrently.
-    Decorates the given function.
-    """
+def run_critical(func):
+    def wrap_func(*args, **kwargs):
+        with threading.current_thread().team.lock:
+            func(*args, **kwargs)
 
-    def wrapped(*args, **kwargs):
-        team = Team(size=None, target=func, args=args, kwargs=kwargs)
-
-        team.start()
-        team.join()
-    return wrapped
+    return wrap_func
