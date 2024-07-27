@@ -10,39 +10,26 @@ Here is an example program that uses the library.
 import omp
 from omp import OpenMP
 
-import threading
+from functools import reduce
 
-N = 40
+N = 20
 
 
 @omp.enable
 def main():
-
-    # Declare a list of N elements.
-    shared_list = [None] * N
-
-    # Start a team of threads.
+    acc = 0
+    acc2 = 1
     with OpenMP("parallel"):
-
-        # Distribute the following for loop across the threads of the team.
-        with OpenMP("for"):
-            # We only do as many iterations as there are threads in the team, showcasing that there are indeed different threads running the loop.
-            for i in range(threading.current_thread().team.size):
-                # Show the current thread rank.
-                print(f"Hello from thread {threading.current_thread().rank}")
-
-        # Distribute the following for loop across the threads of the team.
-        with OpenMP("for"):
-            for i in range(N):
-                shared_list[i] = i
-
-    # Show the resulting list
-    print(shared_list)
+        with OpenMP("for collapse(+:acc) collapse(*:acc2)"):
+            for i in range(1, N):
+                acc += i
+                acc2 *= i
+    print("Actual result:", acc, acc2)
+    print("Expected result:", sum(range(1, N)), reduce((lambda a, b: a*b), range(1, N), 1))
 
 
 if __name__ == '__main__':
     main()
-    pass
 ```
 
 <!-- See `examples` for example usages of the library. ->>
