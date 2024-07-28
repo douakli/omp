@@ -2,7 +2,7 @@
 This library is a proof of concept of a native OpenMP implementation in python.
 
 The `barrier`, `critical`, `for`, `parallel`, `parallel for` and `single` directives are supported,
-as well as the `collapse`, `private` and `nowait` clauses.
+as well as the `reduction`, `private`, `schedule` and `nowait` clauses.
 
 Here is an example program that uses the library.
 
