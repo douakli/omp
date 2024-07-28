@@ -21,7 +21,7 @@ def main():
     acc = 0
     acc2 = 1
     with OpenMP("parallel"):
-        with OpenMP("for collapse(+:acc) collapse(*:acc2)"):
+        with OpenMP("for reduction(+:acc) reduction(*:acc2)"):
             for i in range(1, N):
                 acc += i
                 acc2 *= i
