@@ -65,8 +65,9 @@ with _omp_internal.core.openmp.OpenMP():
 
         @omp.enable
         def generator_dynamic(it, nonce, chunk):
-            with OpenMP("single"):
-                threading.current_thread().team.globalvars[f'_omp_interal_for_q{nonce}'] = queue.Queue()
+            with OpenMP("single private(thread)"):
+                thread = threading.current_thread()
+                thread.team.globalvars[f'_omp_interal_for_q{nonce}'] = queue.Queue(thread.icv.queue_size() if omp.get_num_threads() != 1 else 0)
             q = threading.current_thread().team.globalvars[f'_omp_interal_for_q{nonce}']
             with OpenMP("single nowait"):
                 for el in itertools.batched(it, chunk):

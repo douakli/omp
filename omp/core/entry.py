@@ -158,7 +158,7 @@ def enable(*args, **kwargs):
             )
 
         # ALERT: Remove this debug print. (Shows the final transformed source code.)
-        print(ast.unparse(patched_ast))
+        # print(ast.unparse(patched_ast))
 
         # Compile the patched ast.
         patched: CodeType = compile(patched_ast, filename=inspect.getsourcefile(function), mode='exec')

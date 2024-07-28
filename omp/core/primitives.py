@@ -51,6 +51,9 @@ class InternalControlVariables:
     def run_sched_var(self, value):
         InternalControlVariables._run_sched_var = value
 
+    def queue_size(self):
+        return get_num_threads()*2
+
     def __init__(self, thread: 'omp.core.threading.Thread'):
         self.thread_num_var = thread.rank
         self.team_size_var = thread.team.size

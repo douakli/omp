@@ -13,7 +13,7 @@ def main():
             for i in range(1, N):
                 acc += i
     print("Actual result:  ", acc)
-    print("Expected result:", sum(range(1, N)))
+    print("Expected result:", N*(N-1)//2)
 
 
 if __name__ == '__main__':
