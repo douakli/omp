@@ -41,7 +41,7 @@ class InternalControlVariables:
         InternalControlVariables._nteams_var = value
 
     _OMP_SCHEDULE = 'OMP_SCHEDULE'
-    _run_sched_var = Sched.dynamic if _OMP_SCHEDULE not in os.environ else Sched[os.environ[_OMP_SCHEDULE]]
+    _run_sched_var = (Sched.dynamic, 1) if _OMP_SCHEDULE not in os.environ else (Sched[os.environ[_OMP_SCHEDULE]], 1)
 
     @property
     def run_sched_var(self):
@@ -88,8 +88,8 @@ def get_dynamic():
     return False
 
 
-def set_schedule(kind: Sched):
-    threading.current_thread().icv.run_sched_var = kind
+def set_schedule(kind: Sched, chunk=1):
+    threading.current_thread().icv.run_sched_var = (kind, chunk)
 
 
 def get_schedule():

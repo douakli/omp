@@ -2,14 +2,14 @@
 import omp
 from omp import OpenMP
 
-N = 400000
+N = 400000000
 
 
 @omp.enable
 def main():
     acc = 0
     with OpenMP("parallel"):
-        with OpenMP("for reduction(+:acc) schedule(static)"):
+        with OpenMP("for reduction(+:acc) schedule(dynamic, 10000)"):
             for i in range(1, N):
                 acc += i
     print("Actual result:  ", acc)

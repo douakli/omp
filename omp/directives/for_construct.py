@@ -8,9 +8,10 @@ import random
 import queue
 import time
 import threading
+import itertools
 
 
-def generator_static(it, nonce):
+def generator_static(it, nonce, chunk):
     """
     When called within a thread of a team, yields the iterations for the current thread.
 
@@ -28,7 +29,7 @@ class EndOfQueue:
 @OpenMP.directive('for')
 class ForConstruct(Directive):
 
-    schedule = Sched.runtime
+    schedule = (Sched.runtime, 1)
 
     """
     OpenMP for construct implementation.
@@ -63,12 +64,12 @@ with _omp_internal.core.openmp.OpenMP():
             return
 
         @omp.enable
-        def generator_dynamic(it, nonce):
+        def generator_dynamic(it, nonce, chunk):
             with OpenMP("single"):
                 threading.current_thread().team.globalvars[f'_omp_interal_for_q{nonce}'] = queue.Queue()
             q = threading.current_thread().team.globalvars[f'_omp_interal_for_q{nonce}']
             with OpenMP("single nowait"):
-                for el in it:
+                for el in itertools.batched(it, chunk):
                     q.put(el)
                 for _ in range(omp.get_num_threads()):
                     q.put(EndOfQueue)
@@ -76,7 +77,7 @@ with _omp_internal.core.openmp.OpenMP():
                 el = q.get()
                 if el is EndOfQueue:
                     break
-                yield el
+                yield from el
             OpenMP("barrier")
             with OpenMP("single nowait"):
                 del threading.current_thread().team.globalvars[f'_omp_interal_for_q{nonce}']
@@ -93,11 +94,11 @@ with _omp_internal.core.openmp.OpenMP():
 
         schedule = self.schedule
 
-        if schedule == Sched.runtime:
+        if schedule[0] == Sched.runtime:
             schedule = omp.get_schedule()
 
         # Wrap the loop iterator in our thread-distributing generator.
-        for_node.iter = ast.Call(LinenoStripper().visit(ast.parse(f'_omp_internal.directives.for_construct.generator_{schedule.name}')).body[0].value, args=[for_node.iter, ast.Constant(value=time.time())], keywords=[])
+        for_node.iter = ast.Call(LinenoStripper().visit(ast.parse(f'_omp_internal.directives.for_construct.generator_{schedule[0].name}')).body[0].value, args=[for_node.iter, ast.Constant(value=time.time()), ast.Constant(value=schedule[1])], keywords=[])
 
         # We need to protect the target.
         # ALERT: We need to handle unpacking as well. (`for i,j in it`)
