@@ -14,7 +14,7 @@ class ParallelForConstruct(Directive):
     @property
     def template(self):
         return f"""\
-with _omp_internal.core.openmp.OpenMP("parallel"):
+with _omp_internal.core.openmp.OpenMP("parallel {self.openMP.clause_str}"):
     with _omp_internal.core.openmp.OpenMP("for {self.openMP.clause_str}"):
         pass # Replaced by user code
         """

@@ -19,7 +19,7 @@ class Directive:
 
         self.privates = set()
         self.nowait = False
-        self.collapse = dict()
+        self.reduction = dict()
 
     def parse(self, node: ast.With) -> ast.With:
         """
@@ -32,7 +32,7 @@ class Directive:
         """
         Implementation of an OpenMP directive
         """
-        #raise NotImplementedError()
+        # raise NotImplementedError()
         pass
 
     @staticmethod
@@ -86,7 +86,7 @@ def _omp_internal_inner_func():
         globs, locs = dict(), dict()
         exec(compile(ast_template, '<OMP Parser>', mode='exec'), globs, locs)
 
-        return set(locs['_omp_internal_inner_func'].__code__.co_varnames + locs['_omp_internal_inner_func'].__code__.co_cellvars) - self.privates
+        return [varname for varname in set(locs['_omp_internal_inner_func'].__code__.co_varnames + locs['_omp_internal_inner_func'].__code__.co_cellvars) - self.privates if not varname.startswith('_omp_internal')]
 
 
 class OpenMP:

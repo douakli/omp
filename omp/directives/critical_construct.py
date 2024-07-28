@@ -55,7 +55,8 @@ with _omp_internal.core.openmp.OpenMP():
 
 def run_critical(func):
     def wrap_func(*args, **kwargs):
-        with threading.current_thread().team.lock:
+        lock = threading.current_thread().team.lock
+        with lock:
             func(*args, **kwargs)
 
     return wrap_func

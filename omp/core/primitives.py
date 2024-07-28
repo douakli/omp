@@ -1,8 +1,17 @@
 import omp
 import os
 import threading
+from enum import Enum
 
 import omp.core.threading
+
+
+class Sched(Enum):
+    static = 1
+    dynamic = 2
+    guided = 3
+    auto = 4
+    runtime = 5
 
 
 class InternalControlVariables:
@@ -30,6 +39,17 @@ class InternalControlVariables:
     @nteams_var.setter
     def nteams_var(self, value):
         InternalControlVariables._nteams_var = value
+
+    _OMP_SCHEDULE = 'OMP_SCHEDULE'
+    _run_sched_var = Sched.dynamic if _OMP_SCHEDULE not in os.environ else Sched[os.environ[_OMP_SCHEDULE]]
+
+    @property
+    def run_sched_var(self):
+        return InternalControlVariables._run_sched_var
+
+    @run_sched_var.setter
+    def run_sched_var(self, value):
+        InternalControlVariables._run_sched_var = value
 
     def __init__(self, thread: 'omp.core.threading.Thread'):
         self.thread_num_var = thread.rank
@@ -66,3 +86,11 @@ def get_num_threads():
 
 def get_dynamic():
     return False
+
+
+def set_schedule(kind: Sched):
+    threading.current_thread().icv.run_sched_var = kind
+
+
+def get_schedule():
+    return threading.current_thread().icv.run_sched_var

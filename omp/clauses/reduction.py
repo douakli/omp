@@ -1,10 +1,10 @@
 from omp.core.openmp import OpenMP, Clause
 
 
-@OpenMP.clause('collapse', ('for'))
-class CollapseClause(Clause):
+@OpenMP.clause('reduction', ('for'))
+class ReductionClause(Clause):
 
-    name = 'collapse'
+    name = 'reduction'
 
     def __init__(self, directive, args):
         super().__init__(directive, args)
@@ -12,7 +12,7 @@ class CollapseClause(Clause):
         operator, varname = args.split(':')
 
         self.directive.privates.add(varname.strip())
-        self.directive.collapse.update({varname: operator})
+        self.directive.reduction.update({varname: operator})
 
 
 operators = {

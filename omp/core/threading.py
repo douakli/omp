@@ -41,6 +41,8 @@ class Team:
         # ALERT: Access atomically.
         self.singleThread = None
 
+        self.globalvars = {}
+
     def start(self):
         for thread in self.threads:
             thread.start()

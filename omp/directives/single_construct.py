@@ -24,7 +24,7 @@ with _omp_internal.core.openmp.OpenMP():
     @_omp_internal.directives.single_construct.run_single
     def _omp_internal_inner_func{nonce}():
         pass # Replaced by user code
-    _omp_internal_inner_func{nonce}()
+    _omp_internal_inner_func{nonce}({self.nowait})
         """
 
     def parse(self, node: ast.With) -> ast.With:
@@ -53,7 +53,7 @@ with _omp_internal.core.openmp.OpenMP():
 
 
 def run_single(func):
-    def wrap_func():
+    def wrap_func(nowait):
 
         with threading.current_thread().team.lock:
             if threading.current_thread().team.singleThread is None:
@@ -61,9 +61,11 @@ def run_single(func):
 
         if threading.current_thread().team.singleThread is threading.current_thread():
             func()
-        threading.current_thread().team.barrier.wait()
 
-        if threading.current_thread().team.singleThread is threading.current_thread():
-            threading.current_thread().team.singleThread = None
+        if not nowait:
+            threading.current_thread().team.barrier.wait()
+            if threading.current_thread().team.singleThread is threading.current_thread():
+                threading.current_thread().team.singleThread = None
+            threading.current_thread().team.barrier.wait()
 
     return wrap_func

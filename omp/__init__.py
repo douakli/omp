@@ -23,5 +23,7 @@ get_max_teams = core.primitives.get_max_teams
 get_thread_num = core.primitives.get_thread_num
 get_num_threads = core.primitives.get_num_threads
 get_dynamic = core.primitives.get_dynamic
+set_schedule = core.primitives.set_schedule
+get_schedule = core.primitives.get_schedule
 
 current_thread().icv = core.primitives.InternalControlVariables(current_thread())
