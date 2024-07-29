@@ -5,7 +5,6 @@ from omp.core.primitives import Sched
 
 import ast
 import random
-import queue
 import time
 import threading
 import itertools
@@ -65,23 +64,21 @@ with _omp_internal.core.openmp.OpenMP():
 
         @omp.enable
         def generator_dynamic(it, nonce, chunk):
-            with OpenMP("single private(thread)"):
-                thread = threading.current_thread()
-                thread.team.globalvars[f'_omp_interal_for_q{nonce}'] = queue.Queue(thread.icv.queue_size() if omp.get_num_threads() != 1 else 0)
-            q = threading.current_thread().team.globalvars[f'_omp_interal_for_q{nonce}']
-            with OpenMP("single nowait"):
-                for el in itertools.batched(it, chunk):
-                    q.put(el)
-                for _ in range(omp.get_num_threads()):
-                    q.put(EndOfQueue)
+            thread = threading.current_thread()
+            with OpenMP("single"):
+                thread.team.globalvars[f'_omp_interal_for_batched_it{nonce}'] = iter(itertools.batched(it, chunk)), threading.Lock()
+            batched_it, lock = thread.team.globalvars[f'_omp_interal_for_batched_it{nonce}']
             while True:
-                el = q.get()
-                if el is EndOfQueue:
+                try:
+                    with lock:
+                        el = next(batched_it)
+                except StopIteration:
                     break
-                yield from el
+                else:
+                    yield from el
             OpenMP("barrier")
             with OpenMP("single nowait"):
-                del threading.current_thread().team.globalvars[f'_omp_interal_for_q{nonce}']
+                del thread.team.globalvars[f'_omp_interal_for_batched_it{nonce}']
 
         omp.directives.for_construct.generator_dynamic = generator_dynamic
         omp.directives.for_construct.generator_guided = omp.directives.for_construct.generator_dynamic
