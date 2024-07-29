@@ -1,5 +1,5 @@
 # Native OpenMP for Python
-This library is a proof of concept of a native OpenMP implementation in python.
+This library is a native OpenMP implementation in python.
 
 The `barrier`, `critical`, `for`, `parallel`, `parallel for` and `single` directives are supported,
 as well as the `reduction`, `private`, `schedule` and `nowait` clauses.
