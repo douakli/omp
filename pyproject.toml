@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "omp"
+name = "ompy"
 version = "0.1.0"
 description = "A native implementation of OpenMP in Python."
 authors = ["Dorian OUAKLI <dorian.ouakli@xwiki.com>"]
