@@ -35,7 +35,8 @@ class Team:
         self.size = size
         self.threads = [Thread(i, self, *args, **kwargs) for i in range(self.size)]
 
-        self.barrier = threading.Barrier(size)
+        if size > 0:
+            self.barrier = threading.Barrier(size)
         self.lock = threading.Lock()
 
         # ALERT: Access atomically.
@@ -61,5 +62,6 @@ _mainThread = threading.current_thread()
 _mainThread.rank = 0
 _mainThread.team = Team(size=0)
 _mainThread.team.size = 1
+_mainThread.barrier = threading.Barrier(1)
 _mainThread.team.threads.append(_mainThread)
 _mainThread.omp_parsing = False
